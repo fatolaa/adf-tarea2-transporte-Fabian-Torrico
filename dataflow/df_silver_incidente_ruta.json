@@ -1,0 +1,204 @@
+{
+	"name": "df_silver_incidente_ruta",
+	"properties": {
+		"description": "Silver incidente-ruta: relacion N a N entre incidentes y rutas historicas.",
+		"folder": {
+			"name": "Silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_incidente_ruta_sql",
+						"type": "DatasetReference"
+					},
+					"name": "bronze"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_incidentes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "incidentesSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "rutasSilver"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_silver_incidente_ruta_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_cuarentena_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkCuarentena"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "tipar"
+				},
+				{
+					"name": "equivalencias"
+				},
+				{
+					"name": "incidentesSilverClave"
+				},
+				{
+					"name": "buscarIncidentesSilver"
+				},
+				{
+					"name": "rutasSilverClave"
+				},
+				{
+					"name": "buscarRutasSilver"
+				},
+				{
+					"name": "validar"
+				},
+				{
+					"name": "clasificar"
+				},
+				{
+					"name": "ordenarVersiones"
+				},
+				{
+					"name": "quitarDuplicados"
+				},
+				{
+					"name": "motivoDuplicado"
+				},
+				{
+					"name": "unirObservados"
+				},
+				{
+					"name": "datosCuarentena"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tIncidenteId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tEsPrincipal as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> bronze",
+				"bronze derive(t_IncidenteId = upper(coalesce(trim(IncidenteId), '')),",
+				"\t\tt_RutaHistoricaId = upper(coalesce(trim(RutaHistoricaId), '')),",
+				"\t\tt_EsPrincipal = upper(coalesce(trim(EsPrincipal), '')),",
+				"\t\tFuente = coalesce(trim(AnioFuente), 'SIN_ORIGEN'),",
+				"\t\tPrioridad = coalesce(toInteger(left(trim(AnioFuente), 4)), 0),",
+				"\t\tDatosOrigen = left(concatWS('|', coalesce(IncidenteId, ''), coalesce(RutaHistoricaId, ''), coalesce(EsPrincipal, '')), 1000)) ~> normalizar",
+				"normalizar derive(IncidenteId = t_IncidenteId,",
+				"\t\tEsPrincipal = case(t_EsPrincipal == '1' || t_EsPrincipal == 'TRUE', true(), t_EsPrincipal == '0' || t_EsPrincipal == 'FALSE', false(), toBoolean(null()))) ~> tipar",
+				"tipar derive(RutaHistoricaId = case(t_RutaHistoricaId == '', '', left(t_RutaHistoricaId, 3) == 'RH-', t_RutaHistoricaId, !regexMatch(t_RutaHistoricaId, '^.*[0-9].*$'), t_RutaHistoricaId, regexMatch(t_RutaHistoricaId, '^.*-[NS]$'), concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'), '-', right(t_RutaHistoricaId, 1)), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '07', iif(!isNull(toDate(null())) && toDate(null()) >= toDate('2024-01-01', 'yyyy-MM-dd'), 'RH-07-NEW', 'RH-07-OLD'), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '12', 'RH-12-OLD', concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0')))) ~> equivalencias",
+				"source(output(",
+				"\t\tIncidenteId as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> incidentesSilver",
+				"incidentesSilver select(mapColumn(",
+				"\t\trefIncidenteId = IncidenteId",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> incidentesSilverClave",
+				"equivalencias, incidentesSilverClave lookup(IncidenteId == refIncidenteId,",
+				"\tmultiple: false,",
+				"\tpickup: 'any',",
+				"\tbroadcast: 'auto')~> buscarIncidentesSilver",
+				"source(output(",
+				"\t\tRutaHistoricaId as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> rutasSilver",
+				"rutasSilver select(mapColumn(",
+				"\t\trefRutaId = RutaHistoricaId",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> rutasSilverClave",
+				"buscarIncidentesSilver, rutasSilverClave lookup(RutaHistoricaId == refRutaId,",
+				"\tmultiple: false,",
+				"\tpickup: 'any',",
+				"\tbroadcast: 'auto')~> buscarRutasSilver",
+				"buscarRutasSilver derive(Motivo = case(!regexMatch(RutaHistoricaId, '^RH-[0-9]{2}(-N|-S|-NEW|-OLD)?$'), 'CODIGO DE RUTA NO RECONOCIDO', isNull(EsPrincipal), 'ES PRINCIPAL INVALIDO', isNull(refIncidenteId), 'INCIDENTE NO EXISTE EN SILVER', isNull(refRutaId), 'RUTA NO EXISTE EN SILVER', ''),",
+				"\t\tRegistroId = concat(t_IncidenteId, '/', t_RutaHistoricaId)) ~> validar",
+				"validar split(Motivo == '',",
+				"\tdisjoint: false) ~> clasificar@(validos, observados)",
+				"clasificar@validos window(over(IncidenteId, RutaHistoricaId),",
+				"\tdesc(Prioridad, true),",
+				"\tversion = rowNumber()) ~> ordenarVersiones",
+				"ordenarVersiones split(version == 1,",
+				"\tdisjoint: false) ~> quitarDuplicados@(unicos, duplicados)",
+				"quitarDuplicados@duplicados derive(Motivo = 'DUPLICADO: se conserva la version de la fuente mas reciente') ~> motivoDuplicado",
+				"quitarDuplicados@unicos sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tIncidenteId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tEsPrincipal as boolean",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tIncidenteId,",
+				"\t\tRutaHistoricaId,",
+				"\t\tEsPrincipal",
+				"\t)) ~> sinkSilver",
+				"clasificar@observados, motivoDuplicado union(byName: true)~> unirObservados",
+				"unirObservados derive(Entidad = 'IncidenteRuta') ~> datosCuarentena",
+				"datosCuarentena sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tEntidad as string,",
+				"\t\tRegistroId as string,",
+				"\t\tFuente as string,",
+				"\t\tMotivo as string,",
+				"\t\tDatosOrigen as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tEntidad,",
+				"\t\tRegistroId,",
+				"\t\tFuente,",
+				"\t\tMotivo,",
+				"\t\tDatosOrigen",
+				"\t)) ~> sinkCuarentena"
+			]
+		}
+	}
+}

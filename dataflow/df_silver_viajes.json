@@ -1,0 +1,239 @@
+{
+	"name": "df_silver_viajes",
+	"properties": {
+		"description": "Silver viajes: id VJ-anio-numero, horas a HH:mm:ss, km con coma decimal, rutas y vehiculos con equivalencias y validacion contra silver.",
+		"folder": {
+			"name": "Silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_viajes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "bronze"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "rutasSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_vehiculos_sql",
+						"type": "DatasetReference"
+					},
+					"name": "vehiculosSilver"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_silver_viajes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_cuarentena_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkCuarentena"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "tipar"
+				},
+				{
+					"name": "equivalencias"
+				},
+				{
+					"name": "rutasSilverClave"
+				},
+				{
+					"name": "buscarRutasSilver"
+				},
+				{
+					"name": "vehiculosSilverClave"
+				},
+				{
+					"name": "buscarVehiculosSilver"
+				},
+				{
+					"name": "validar"
+				},
+				{
+					"name": "clasificar"
+				},
+				{
+					"name": "ordenarVersiones"
+				},
+				{
+					"name": "quitarDuplicados"
+				},
+				{
+					"name": "motivoDuplicado"
+				},
+				{
+					"name": "unirObservados"
+				},
+				{
+					"name": "datosCuarentena"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tViajeId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tVehiculoId as string,",
+				"\t\tFechaServicio as string,",
+				"\t\tHoraProgramada as string,",
+				"\t\tHoraSalida as string,",
+				"\t\tHoraLlegada as string,",
+				"\t\tValidacionesTarjeta as string,",
+				"\t\tKmRecorridos as string,",
+				"\t\tEstadoViaje as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> bronze",
+				"bronze derive(t_ViajeId = upper(coalesce(trim(ViajeId), '')),",
+				"\t\tt_RutaHistoricaId = upper(coalesce(trim(RutaHistoricaId), '')),",
+				"\t\tt_VehiculoId = upper(coalesce(trim(VehiculoId), '')),",
+				"\t\tt_FechaServicio = coalesce(trim(FechaServicio), ''),",
+				"\t\tt_HoraProgramada = coalesce(trim(HoraProgramada), ''),",
+				"\t\tt_HoraSalida = coalesce(trim(HoraSalida), ''),",
+				"\t\tt_HoraLlegada = coalesce(trim(HoraLlegada), ''),",
+				"\t\tt_ValidacionesTarjeta = coalesce(trim(ValidacionesTarjeta), ''),",
+				"\t\tt_KmRecorridos = coalesce(trim(KmRecorridos), ''),",
+				"\t\tt_EstadoViaje = upper(coalesce(trim(EstadoViaje), '')),",
+				"\t\tFuente = coalesce(trim(AnioFuente), 'SIN_ORIGEN'),",
+				"\t\tPrioridad = coalesce(toInteger(left(trim(AnioFuente), 4)), 0),",
+				"\t\tDatosOrigen = left(concatWS('|', coalesce(ViajeId, ''), coalesce(RutaHistoricaId, ''), coalesce(VehiculoId, ''), coalesce(FechaServicio, ''), coalesce(HoraProgramada, ''), coalesce(HoraSalida, ''), coalesce(HoraLlegada, ''), coalesce(ValidacionesTarjeta, ''), coalesce(KmRecorridos, ''), coalesce(EstadoViaje, '')), 1000)) ~> normalizar",
+				"normalizar derive(FechaServicio = case(t_FechaServicio == '', toDate(null()), regexMatch(t_FechaServicio, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'), toDate(t_FechaServicio, 'dd/MM/yyyy'), regexMatch(t_FechaServicio, '^[0-9]{4}-[0-9]{2}-[0-9]{2}.*$'), toDate(left(t_FechaServicio, 10), 'yyyy-MM-dd'), regexMatch(t_FechaServicio, '^[0-9]{5}([.]0+)?$'), addDays(toDate('1899-12-30', 'yyyy-MM-dd'), toInteger(toDouble(t_FechaServicio))), regexMatch(t_FechaServicio, '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}.*$'), toDate(regexExtract(t_FechaServicio, '^([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})', 1), 'M/d/yyyy'), toDate(null())),",
+				"\t\tHoraProgramada = case(regexMatch(t_HoraProgramada, '^.*([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$'), concat(lpad(toString(case(regexMatch(t_HoraProgramada, '^.*[Pp][Mm]$') && toInteger(regexExtract(t_HoraProgramada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) < 12, toInteger(regexExtract(t_HoraProgramada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) + 12, regexMatch(t_HoraProgramada, '^.*[Aa][Mm]$') && toInteger(regexExtract(t_HoraProgramada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) == 12, 0, toInteger(regexExtract(t_HoraProgramada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)))), 2, '0'), ':', regexExtract(t_HoraProgramada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 2), ':00'), regexMatch(t_HoraProgramada, '^0?[.][0-9]+$'), concat(lpad(toString(toInteger(floor(toInteger(round(toDouble(t_HoraProgramada) * 1440)) / 60))), 2, '0'), ':', lpad(toString(mod(toInteger(round(toDouble(t_HoraProgramada) * 1440)), 60)), 2, '0'), ':00'), toString(null())),",
+				"\t\tHoraSalida = case(regexMatch(t_HoraSalida, '^.*([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$'), concat(lpad(toString(case(regexMatch(t_HoraSalida, '^.*[Pp][Mm]$') && toInteger(regexExtract(t_HoraSalida, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) < 12, toInteger(regexExtract(t_HoraSalida, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) + 12, regexMatch(t_HoraSalida, '^.*[Aa][Mm]$') && toInteger(regexExtract(t_HoraSalida, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) == 12, 0, toInteger(regexExtract(t_HoraSalida, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)))), 2, '0'), ':', regexExtract(t_HoraSalida, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 2), ':00'), regexMatch(t_HoraSalida, '^0?[.][0-9]+$'), concat(lpad(toString(toInteger(floor(toInteger(round(toDouble(t_HoraSalida) * 1440)) / 60))), 2, '0'), ':', lpad(toString(mod(toInteger(round(toDouble(t_HoraSalida) * 1440)), 60)), 2, '0'), ':00'), toString(null())),",
+				"\t\tHoraLlegada = case(regexMatch(t_HoraLlegada, '^.*([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$'), concat(lpad(toString(case(regexMatch(t_HoraLlegada, '^.*[Pp][Mm]$') && toInteger(regexExtract(t_HoraLlegada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) < 12, toInteger(regexExtract(t_HoraLlegada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) + 12, regexMatch(t_HoraLlegada, '^.*[Aa][Mm]$') && toInteger(regexExtract(t_HoraLlegada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)) == 12, 0, toInteger(regexExtract(t_HoraLlegada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 1)))), 2, '0'), ':', regexExtract(t_HoraLlegada, '([0-9]{1,2}):([0-9]{2})(:[0-9]{2})?([ ]?[AaPp][Mm])?$', 2), ':00'), regexMatch(t_HoraLlegada, '^0?[.][0-9]+$'), concat(lpad(toString(toInteger(floor(toInteger(round(toDouble(t_HoraLlegada) * 1440)) / 60))), 2, '0'), ':', lpad(toString(mod(toInteger(round(toDouble(t_HoraLlegada) * 1440)), 60)), 2, '0'), ':00'), toString(null())),",
+				"\t\tValidacionesTarjeta = coalesce(toInteger(round(toDouble(replace(t_ValidacionesTarjeta, ',', '.')))), 0),",
+				"\t\tKmRecorridos = toDecimal(replace(t_KmRecorridos, ',', '.'), 8, 1),",
+				"\t\tEstadoViaje = t_EstadoViaje) ~> tipar",
+				"tipar derive(ViajeId = iif(regexMatch(t_ViajeId, '^[0-9]{1,5}$') && !isNull(FechaServicio), concat('VJ-', toString(year(FechaServicio)), '-', lpad(t_ViajeId, 5, '0')), t_ViajeId),",
+				"\t\tRutaHistoricaId = case(t_RutaHistoricaId == '', '', left(t_RutaHistoricaId, 3) == 'RH-', t_RutaHistoricaId, !regexMatch(t_RutaHistoricaId, '^.*[0-9].*$'), t_RutaHistoricaId, regexMatch(t_RutaHistoricaId, '^.*-[NS]$'), concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'), '-', right(t_RutaHistoricaId, 1)), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '07', iif(!isNull(FechaServicio) && FechaServicio >= toDate('2024-01-01', 'yyyy-MM-dd'), 'RH-07-NEW', 'RH-07-OLD'), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '12', 'RH-12-OLD', concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'))),",
+				"\t\tVehiculoId = case(t_VehiculoId == '', '', !regexMatch(t_VehiculoId, '^.*[0-9].*$'), t_VehiculoId, concat('V-', lpad(regexExtract(t_VehiculoId, '([0-9]+)', 1), 3, '0')))) ~> equivalencias",
+				"source(output(",
+				"\t\tRutaHistoricaId as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> rutasSilver",
+				"rutasSilver select(mapColumn(",
+				"\t\trefRutaId = RutaHistoricaId",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> rutasSilverClave",
+				"equivalencias, rutasSilverClave lookup(RutaHistoricaId == refRutaId,",
+				"\tmultiple: false,",
+				"\tpickup: 'any',",
+				"\tbroadcast: 'auto')~> buscarRutasSilver",
+				"source(output(",
+				"\t\tVehiculoId as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> vehiculosSilver",
+				"vehiculosSilver select(mapColumn(",
+				"\t\trefVehiculoId = VehiculoId",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> vehiculosSilverClave",
+				"buscarRutasSilver, vehiculosSilverClave lookup(VehiculoId == refVehiculoId,",
+				"\tmultiple: false,",
+				"\tpickup: 'any',",
+				"\tbroadcast: 'auto')~> buscarVehiculosSilver",
+				"buscarVehiculosSilver derive(Motivo = case(!regexMatch(ViajeId, '^VJ-[0-9]{4}-[0-9]{5}$'), 'ID DE VIAJE NO VALIDO (FILA DE TOTALES O ID ALTERADO)', isNull(FechaServicio), 'FECHA DE SERVICIO INVALIDA', isNull(HoraProgramada) || isNull(HoraSalida) || isNull(HoraLlegada) || !regexMatch(HoraSalida, '^([01][0-9]|2[0-3]):[0-5][0-9]:00$') || !regexMatch(HoraLlegada, '^([01][0-9]|2[0-3]):[0-5][0-9]:00$') || !regexMatch(HoraProgramada, '^([01][0-9]|2[0-3]):[0-5][0-9]:00$'), 'HORA INVALIDA', HoraLlegada < HoraSalida, 'HORA DE LLEGADA ANTERIOR A LA SALIDA', isNull(KmRecorridos) || KmRecorridos < 0, 'KM RECORRIDOS INVALIDO', EstadoViaje == '', 'ESTADO DEL VIAJE VACIO', isNull(refRutaId), 'RUTA NO EXISTE EN SILVER', isNull(refVehiculoId), 'VEHICULO NO EXISTE EN SILVER', ''),",
+				"\t\tRegistroId = iif(ViajeId != '', ViajeId, t_ViajeId)) ~> validar",
+				"validar split(Motivo == '',",
+				"\tdisjoint: false) ~> clasificar@(validos, observados)",
+				"clasificar@validos window(over(ViajeId),",
+				"\tdesc(Prioridad, true),",
+				"\tversion = rowNumber()) ~> ordenarVersiones",
+				"ordenarVersiones split(version == 1,",
+				"\tdisjoint: false) ~> quitarDuplicados@(unicos, duplicados)",
+				"quitarDuplicados@duplicados derive(Motivo = 'DUPLICADO: se conserva la version de la fuente mas reciente') ~> motivoDuplicado",
+				"quitarDuplicados@unicos sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tViajeId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tVehiculoId as string,",
+				"\t\tFechaServicio as date,",
+				"\t\tHoraProgramada as string,",
+				"\t\tHoraSalida as string,",
+				"\t\tHoraLlegada as string,",
+				"\t\tValidacionesTarjeta as integer,",
+				"\t\tKmRecorridos as decimal(8,1),",
+				"\t\tEstadoViaje as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tViajeId,",
+				"\t\tRutaHistoricaId,",
+				"\t\tVehiculoId,",
+				"\t\tFechaServicio,",
+				"\t\tHoraProgramada,",
+				"\t\tHoraSalida,",
+				"\t\tHoraLlegada,",
+				"\t\tValidacionesTarjeta,",
+				"\t\tKmRecorridos,",
+				"\t\tEstadoViaje",
+				"\t)) ~> sinkSilver",
+				"clasificar@observados, motivoDuplicado union(byName: true)~> unirObservados",
+				"unirObservados derive(Entidad = 'Viajes') ~> datosCuarentena",
+				"datosCuarentena sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tEntidad as string,",
+				"\t\tRegistroId as string,",
+				"\t\tFuente as string,",
+				"\t\tMotivo as string,",
+				"\t\tDatosOrigen as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tEntidad,",
+				"\t\tRegistroId,",
+				"\t\tFuente,",
+				"\t\tMotivo,",
+				"\t\tDatosOrigen",
+				"\t)) ~> sinkCuarentena"
+			]
+		}
+	}
+}

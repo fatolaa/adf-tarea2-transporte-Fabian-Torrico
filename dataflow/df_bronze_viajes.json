@@ -1,0 +1,220 @@
+{
+	"name": "df_bronze_viajes",
+	"properties": {
+		"description": "Capa bronze: une Viajes de CSV (2020-2021), Excel 2022, Excel 2023 y Azure SQL (2024-2025) sin limpiar. AnioFuente identifica el origen de cada fila.",
+		"folder": {
+			"name": "Bronze"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "bronze_viajes_csv",
+						"type": "DatasetReference"
+					},
+					"name": "csv"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_viajes_2022_xls",
+						"type": "DatasetReference"
+					},
+					"name": "xls2022"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_viajes_2023_xls",
+						"type": "DatasetReference"
+					},
+					"name": "xls2023"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_viajes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sql"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_viajes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkBronze"
+				}
+			],
+			"transformations": [
+				{
+					"name": "renombrarCsv"
+				},
+				{
+					"name": "renombrarXls2022"
+				},
+				{
+					"name": "renombrarXls2023"
+				},
+				{
+					"name": "origenCsv"
+				},
+				{
+					"name": "origenXls2022"
+				},
+				{
+					"name": "origenXls2023"
+				},
+				{
+					"name": "unirFuentes"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tid_viaje as string,",
+				"\t\tcod_ruta as string,",
+				"\t\tnro_bus as string,",
+				"\t\tfec_servicio as string,",
+				"\t\thora_programada as string,",
+				"\t\thora_salida as string,",
+				"\t\thora_llegada as string,",
+				"\t\tpasajeros_reportados as string,",
+				"\t\tkm_recorridos as string,",
+				"\t\testado_viaje as string,",
+				"\t\ttipo_metrica as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> csv",
+				"source(output(",
+				"\t\tid_viaje as string,",
+				"\t\tcod_ruta as string,",
+				"\t\tnro_bus as string,",
+				"\t\tfecha_servicio as string,",
+				"\t\thora_programada as string,",
+				"\t\thora_salida as string,",
+				"\t\thora_llegada as string,",
+				"\t\tpasajeros_estimados as string,",
+				"\t\tkm_recorridos as string,",
+				"\t\testado_viaje as string,",
+				"\t\ttipo_metrica as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> xls2022",
+				"source(output(",
+				"\t\tid_viaje as string,",
+				"\t\tcod_ruta as string,",
+				"\t\tnro_bus as string,",
+				"\t\tfecha_servicio as string,",
+				"\t\thora_programada as string,",
+				"\t\thora_salida as string,",
+				"\t\thora_llegada as string,",
+				"\t\tpasajeros_estimados as string,",
+				"\t\tkm_recorridos as string,",
+				"\t\testado_viaje as string,",
+				"\t\ttipo_metrica as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> xls2023",
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tViajeId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tVehiculoId as string,",
+				"\t\tFechaServicio as string,",
+				"\t\tHoraProgramada as string,",
+				"\t\tHoraSalida as string,",
+				"\t\tHoraLlegada as string,",
+				"\t\tValidacionesTarjeta as string,",
+				"\t\tKmRecorridos as string,",
+				"\t\tEstadoViaje as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> sql",
+				"csv select(mapColumn(",
+				"\t\tViajeId = id_viaje,",
+				"\t\tRutaHistoricaId = cod_ruta,",
+				"\t\tVehiculoId = nro_bus,",
+				"\t\tFechaServicio = fec_servicio,",
+				"\t\tHoraProgramada = hora_programada,",
+				"\t\tHoraSalida = hora_salida,",
+				"\t\tHoraLlegada = hora_llegada,",
+				"\t\tKmRecorridos = km_recorridos,",
+				"\t\tEstadoViaje = estado_viaje",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarCsv",
+				"xls2022 select(mapColumn(",
+				"\t\tViajeId = id_viaje,",
+				"\t\tRutaHistoricaId = cod_ruta,",
+				"\t\tVehiculoId = nro_bus,",
+				"\t\tFechaServicio = fecha_servicio,",
+				"\t\tHoraProgramada = hora_programada,",
+				"\t\tHoraSalida = hora_salida,",
+				"\t\tHoraLlegada = hora_llegada,",
+				"\t\tKmRecorridos = km_recorridos,",
+				"\t\tEstadoViaje = estado_viaje",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarXls2022",
+				"xls2023 select(mapColumn(",
+				"\t\tViajeId = id_viaje,",
+				"\t\tRutaHistoricaId = cod_ruta,",
+				"\t\tVehiculoId = nro_bus,",
+				"\t\tFechaServicio = fecha_servicio,",
+				"\t\tHoraProgramada = hora_programada,",
+				"\t\tHoraSalida = hora_salida,",
+				"\t\tHoraLlegada = hora_llegada,",
+				"\t\tKmRecorridos = km_recorridos,",
+				"\t\tEstadoViaje = estado_viaje",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarXls2023",
+				"renombrarCsv derive(AnioFuente = '2020-2021') ~> origenCsv",
+				"renombrarXls2022 derive(AnioFuente = '2022') ~> origenXls2022",
+				"renombrarXls2023 derive(AnioFuente = '2023') ~> origenXls2023",
+				"origenCsv, origenXls2022, origenXls2023, sql union(byName: true)~> unirFuentes",
+				"unirFuentes sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tAnioFuente as string,",
+				"\t\tViajeId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tVehiculoId as string,",
+				"\t\tFechaServicio as string,",
+				"\t\tHoraProgramada as string,",
+				"\t\tHoraSalida as string,",
+				"\t\tHoraLlegada as string,",
+				"\t\tValidacionesTarjeta as string,",
+				"\t\tKmRecorridos as string,",
+				"\t\tEstadoViaje as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tAnioFuente,",
+				"\t\tViajeId,",
+				"\t\tRutaHistoricaId,",
+				"\t\tVehiculoId,",
+				"\t\tFechaServicio,",
+				"\t\tHoraProgramada,",
+				"\t\tHoraSalida,",
+				"\t\tHoraLlegada,",
+				"\t\tValidacionesTarjeta,",
+				"\t\tKmRecorridos,",
+				"\t\tEstadoViaje",
+				"\t)) ~> sinkBronze"
+			]
+		}
+	}
+}

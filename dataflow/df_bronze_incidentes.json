@@ -1,0 +1,298 @@
+{
+	"name": "df_bronze_incidentes",
+	"properties": {
+		"description": "Capa bronze: une incidentes de las 4 fuentes. Ademas separa rutas_afectadas (CSV/Excel) en filas de IncidenteRuta y las une con la tabla del ERP.",
+		"folder": {
+			"name": "Bronze"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "bronze_incidentes_csv",
+						"type": "DatasetReference"
+					},
+					"name": "csv"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_incidentes_2022_xls",
+						"type": "DatasetReference"
+					},
+					"name": "xls2022"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_incidentes_2023_xls",
+						"type": "DatasetReference"
+					},
+					"name": "xls2023"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_incidentes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sql"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_incidente_ruta_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sqlIncidenteRuta"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_incidentes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkIncidentes"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_incidente_ruta_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkIncidenteRuta"
+				}
+			],
+			"transformations": [
+				{
+					"name": "renombrarCsv"
+				},
+				{
+					"name": "origenCsv"
+				},
+				{
+					"name": "renombrarXls2022"
+				},
+				{
+					"name": "origenXls2022"
+				},
+				{
+					"name": "renombrarXls2023"
+				},
+				{
+					"name": "origenXls2023"
+				},
+				{
+					"name": "unirArchivos"
+				},
+				{
+					"name": "juntarFechaHora"
+				},
+				{
+					"name": "unirIncidentes"
+				},
+				{
+					"name": "separarRutas"
+				},
+				{
+					"name": "rutaPrincipal"
+				},
+				{
+					"name": "conRutaSecundaria"
+				},
+				{
+					"name": "rutaSecundaria"
+				},
+				{
+					"name": "unirIncidenteRuta"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tid_incidente as string,",
+				"\t\ttipo as string,",
+				"\t\tseveridad as string,",
+				"\t\tfecha_inicio as string,",
+				"\t\thora_inicio as string,",
+				"\t\tfecha_fin as string,",
+				"\t\thora_fin as string,",
+				"\t\tfecha_registro as string,",
+				"\t\trutas_afectadas as string,",
+				"\t\tvehiculo_afectado as string,",
+				"\t\tdescripcion as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> csv",
+				"source(output(",
+				"\t\tid_incidente as string,",
+				"\t\ttipo as string,",
+				"\t\tseveridad as string,",
+				"\t\tfecha_inicio as string,",
+				"\t\thora_inicio as string,",
+				"\t\tfecha_fin as string,",
+				"\t\thora_fin as string,",
+				"\t\tfecha_registro as string,",
+				"\t\trutas_afectadas as string,",
+				"\t\tvehiculo_afectado as string,",
+				"\t\tdescripcion as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> xls2022",
+				"source(output(",
+				"\t\tid_incidente as string,",
+				"\t\ttipo as string,",
+				"\t\tseveridad as string,",
+				"\t\tfecha_inicio as string,",
+				"\t\thora_inicio as string,",
+				"\t\tfecha_fin as string,",
+				"\t\thora_fin as string,",
+				"\t\tfecha_registro as string,",
+				"\t\trutas_afectadas as string,",
+				"\t\tvehiculo_afectado as string,",
+				"\t\tdescripcion as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> xls2023",
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tIncidenteId as string,",
+				"\t\tTipoIncidente as string,",
+				"\t\tSeveridad as string,",
+				"\t\tFechaHoraInicio as string,",
+				"\t\tFechaHoraFin as string,",
+				"\t\tFechaHoraRegistro as string,",
+				"\t\tVehiculoId as string,",
+				"\t\tDescripcion as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> sql",
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tIncidenteId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tEsPrincipal as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> sqlIncidenteRuta",
+				"csv select(mapColumn(",
+				"\t\tIncidenteId = id_incidente,",
+				"\t\tTipoIncidente = tipo,",
+				"\t\tSeveridad = severidad,",
+				"\t\tFechaInicio = fecha_inicio,",
+				"\t\tHoraInicio = hora_inicio,",
+				"\t\tFechaFin = fecha_fin,",
+				"\t\tHoraFin = hora_fin,",
+				"\t\tFechaHoraRegistro = fecha_registro,",
+				"\t\tRutasAfectadas = rutas_afectadas,",
+				"\t\tVehiculoId = vehiculo_afectado,",
+				"\t\tDescripcion = descripcion",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarCsv",
+				"renombrarCsv derive(AnioFuente = '2020-2021') ~> origenCsv",
+				"xls2022 select(mapColumn(",
+				"\t\tIncidenteId = id_incidente,",
+				"\t\tTipoIncidente = tipo,",
+				"\t\tSeveridad = severidad,",
+				"\t\tFechaInicio = fecha_inicio,",
+				"\t\tHoraInicio = hora_inicio,",
+				"\t\tFechaFin = fecha_fin,",
+				"\t\tHoraFin = hora_fin,",
+				"\t\tFechaHoraRegistro = fecha_registro,",
+				"\t\tRutasAfectadas = rutas_afectadas,",
+				"\t\tVehiculoId = vehiculo_afectado,",
+				"\t\tDescripcion = descripcion",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarXls2022",
+				"renombrarXls2022 derive(AnioFuente = '2022') ~> origenXls2022",
+				"xls2023 select(mapColumn(",
+				"\t\tIncidenteId = id_incidente,",
+				"\t\tTipoIncidente = tipo,",
+				"\t\tSeveridad = severidad,",
+				"\t\tFechaInicio = fecha_inicio,",
+				"\t\tHoraInicio = hora_inicio,",
+				"\t\tFechaFin = fecha_fin,",
+				"\t\tHoraFin = hora_fin,",
+				"\t\tFechaHoraRegistro = fecha_registro,",
+				"\t\tRutasAfectadas = rutas_afectadas,",
+				"\t\tVehiculoId = vehiculo_afectado,",
+				"\t\tDescripcion = descripcion",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarXls2023",
+				"renombrarXls2023 derive(AnioFuente = '2023') ~> origenXls2023",
+				"origenCsv, origenXls2022, origenXls2023 union(byName: true)~> unirArchivos",
+				"unirArchivos derive(FechaHoraInicio = concat(coalesce(FechaInicio, ''), ' ', coalesce(HoraInicio, '')),",
+				"\t\tFechaHoraFin = concat(coalesce(FechaFin, ''), ' ', coalesce(HoraFin, ''))) ~> juntarFechaHora",
+				"juntarFechaHora, sql union(byName: true)~> unirIncidentes",
+				"unirIncidentes sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tAnioFuente as string,",
+				"\t\tIncidenteId as string,",
+				"\t\tTipoIncidente as string,",
+				"\t\tSeveridad as string,",
+				"\t\tFechaHoraInicio as string,",
+				"\t\tFechaHoraFin as string,",
+				"\t\tFechaHoraRegistro as string,",
+				"\t\tVehiculoId as string,",
+				"\t\tDescripcion as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tAnioFuente,",
+				"\t\tIncidenteId,",
+				"\t\tTipoIncidente,",
+				"\t\tSeveridad,",
+				"\t\tFechaHoraInicio,",
+				"\t\tFechaHoraFin,",
+				"\t\tFechaHoraRegistro,",
+				"\t\tVehiculoId,",
+				"\t\tDescripcion",
+				"\t)) ~> sinkIncidentes",
+				"unirArchivos derive(RutaPrincipal = iif(instr(coalesce(trim(RutasAfectadas), ''), '|') > 0, left(coalesce(trim(RutasAfectadas), ''), instr(coalesce(trim(RutasAfectadas), ''), '|') - 1), coalesce(trim(RutasAfectadas), '')),",
+				"\t\tRutaSecundaria = iif(instr(coalesce(trim(RutasAfectadas), ''), '|') > 0, substring(coalesce(trim(RutasAfectadas), ''), instr(coalesce(trim(RutasAfectadas), ''), '|') + 1, 200), '')) ~> separarRutas",
+				"separarRutas derive(RutaHistoricaId = RutaPrincipal,",
+				"\t\tEsPrincipal = '1') ~> rutaPrincipal",
+				"separarRutas filter(RutaSecundaria != '') ~> conRutaSecundaria",
+				"conRutaSecundaria derive(RutaHistoricaId = RutaSecundaria,",
+				"\t\tEsPrincipal = '0') ~> rutaSecundaria",
+				"rutaPrincipal, rutaSecundaria, sqlIncidenteRuta union(byName: true)~> unirIncidenteRuta",
+				"unirIncidenteRuta sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tAnioFuente as string,",
+				"\t\tIncidenteId as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tEsPrincipal as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tAnioFuente,",
+				"\t\tIncidenteId,",
+				"\t\tRutaHistoricaId,",
+				"\t\tEsPrincipal",
+				"\t)) ~> sinkIncidenteRuta"
+			]
+		}
+	}
+}

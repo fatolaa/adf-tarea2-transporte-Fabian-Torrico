@@ -1,0 +1,176 @@
+{
+	"name": "df_silver_paradas",
+	"properties": {
+		"description": "Silver paradas: tipa coordenadas y fechas; MC-01 se separa en P219-MC-OLD (hasta 30/06/2023) y P220-MC-NEW.",
+		"folder": {
+			"name": "Silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "bronze"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_silver_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_cuarentena_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkCuarentena"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "tipar"
+				},
+				{
+					"name": "equivalencias"
+				},
+				{
+					"name": "validar"
+				},
+				{
+					"name": "clasificar"
+				},
+				{
+					"name": "ordenarVersiones"
+				},
+				{
+					"name": "quitarDuplicados"
+				},
+				{
+					"name": "motivoDuplicado"
+				},
+				{
+					"name": "unirObservados"
+				},
+				{
+					"name": "datosCuarentena"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tParadaHistoricaId as string,",
+				"\t\tCodigoPublicado as string,",
+				"\t\tNombreParada as string,",
+				"\t\tZona as string,",
+				"\t\tLatitud as string,",
+				"\t\tLongitud as string,",
+				"\t\tVigenciaDesde as string,",
+				"\t\tVigenciaHasta as string,",
+				"\t\tEstado as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> bronze",
+				"bronze derive(t_ParadaHistoricaId = upper(coalesce(trim(ParadaHistoricaId), '')),",
+				"\t\tt_CodigoPublicado = upper(coalesce(trim(CodigoPublicado), '')),",
+				"\t\tt_NombreParada = coalesce(trim(NombreParada), ''),",
+				"\t\tt_Zona = upper(coalesce(trim(Zona), '')),",
+				"\t\tt_Latitud = coalesce(trim(Latitud), ''),",
+				"\t\tt_Longitud = coalesce(trim(Longitud), ''),",
+				"\t\tt_VigenciaDesde = coalesce(trim(VigenciaDesde), ''),",
+				"\t\tt_VigenciaHasta = coalesce(trim(VigenciaHasta), ''),",
+				"\t\tt_Estado = upper(coalesce(trim(Estado), '')),",
+				"\t\tFuente = coalesce(trim(AnioFuente), 'SIN_ORIGEN'),",
+				"\t\tPrioridad = coalesce(toInteger(left(trim(AnioFuente), 4)), 0),",
+				"\t\tDatosOrigen = left(concatWS('|', coalesce(ParadaHistoricaId, ''), coalesce(CodigoPublicado, ''), coalesce(NombreParada, ''), coalesce(Zona, ''), coalesce(Latitud, ''), coalesce(Longitud, ''), coalesce(VigenciaDesde, ''), coalesce(VigenciaHasta, ''), coalesce(Estado, '')), 1000)) ~> normalizar",
+				"normalizar derive(VigenciaDesde = case(t_VigenciaDesde == '', toDate(null()), regexMatch(t_VigenciaDesde, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'), toDate(t_VigenciaDesde, 'dd/MM/yyyy'), regexMatch(t_VigenciaDesde, '^[0-9]{4}-[0-9]{2}-[0-9]{2}.*$'), toDate(left(t_VigenciaDesde, 10), 'yyyy-MM-dd'), regexMatch(t_VigenciaDesde, '^[0-9]{5}([.]0+)?$'), addDays(toDate('1899-12-30', 'yyyy-MM-dd'), toInteger(toDouble(t_VigenciaDesde))), regexMatch(t_VigenciaDesde, '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}.*$'), toDate(regexExtract(t_VigenciaDesde, '^([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})', 1), 'M/d/yyyy'), toDate(null())),",
+				"\t\tVigenciaHasta = case(t_VigenciaHasta == '', toDate(null()), regexMatch(t_VigenciaHasta, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'), toDate(t_VigenciaHasta, 'dd/MM/yyyy'), regexMatch(t_VigenciaHasta, '^[0-9]{4}-[0-9]{2}-[0-9]{2}.*$'), toDate(left(t_VigenciaHasta, 10), 'yyyy-MM-dd'), regexMatch(t_VigenciaHasta, '^[0-9]{5}([.]0+)?$'), addDays(toDate('1899-12-30', 'yyyy-MM-dd'), toInteger(toDouble(t_VigenciaHasta))), regexMatch(t_VigenciaHasta, '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}.*$'), toDate(regexExtract(t_VigenciaHasta, '^([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})', 1), 'M/d/yyyy'), toDate(null())),",
+				"\t\tLatitud = toDecimal(replace(t_Latitud, ',', '.'), 9, 6),",
+				"\t\tLongitud = toDecimal(replace(t_Longitud, ',', '.'), 9, 6),",
+				"\t\tNombreParada = t_NombreParada,",
+				"\t\tZona = t_Zona,",
+				"\t\tEstado = t_Estado) ~> tipar",
+				"tipar derive(ParadaHistoricaId = case(t_ParadaHistoricaId == 'MC-01', iif(!isNull(VigenciaDesde) && VigenciaDesde >= toDate('2023-07-01', 'yyyy-MM-dd'), 'P220-MC-NEW', 'P219-MC-OLD'), t_ParadaHistoricaId),",
+				"\t\tCodigoPublicado = iif(t_CodigoPublicado != '', t_CodigoPublicado, t_ParadaHistoricaId)) ~> equivalencias",
+				"equivalencias derive(Motivo = case(ParadaHistoricaId == '', 'PARADA SIN CODIGO', !regexMatch(ParadaHistoricaId, '^P[0-9]{3}(-MC-NEW|-MC-OLD)?$'), 'CODIGO DE PARADA NO RECONOCIDO', NombreParada == '', 'NOMBRE VACIO', Zona == '', 'ZONA VACIA', isNull(Latitud) || isNull(Longitud), 'COORDENADA INVALIDA', Latitud < -23 || Latitud > -9 || Longitud < -70 || Longitud > -57, 'COORDENADA FUERA DE BOLIVIA', isNull(VigenciaDesde) || isNull(VigenciaHasta), 'FECHA DE VIGENCIA INVALIDA', VigenciaHasta < VigenciaDesde, 'VIGENCIA HASTA ANTERIOR A VIGENCIA DESDE', Estado == '', 'ESTADO VACIO', ''),",
+				"\t\tRegistroId = iif(ParadaHistoricaId != '', ParadaHistoricaId, t_ParadaHistoricaId)) ~> validar",
+				"validar split(Motivo == '',",
+				"\tdisjoint: false) ~> clasificar@(validos, observados)",
+				"clasificar@validos window(over(ParadaHistoricaId),",
+				"\tdesc(Prioridad, true),",
+				"\tversion = rowNumber()) ~> ordenarVersiones",
+				"ordenarVersiones split(version == 1,",
+				"\tdisjoint: false) ~> quitarDuplicados@(unicos, duplicados)",
+				"quitarDuplicados@duplicados derive(Motivo = 'DUPLICADO: se conserva la version de la fuente mas reciente') ~> motivoDuplicado",
+				"quitarDuplicados@unicos sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tParadaHistoricaId as string,",
+				"\t\tCodigoPublicado as string,",
+				"\t\tNombreParada as string,",
+				"\t\tZona as string,",
+				"\t\tLatitud as decimal(9,6),",
+				"\t\tLongitud as decimal(9,6),",
+				"\t\tVigenciaDesde as date,",
+				"\t\tVigenciaHasta as date,",
+				"\t\tEstado as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tParadaHistoricaId,",
+				"\t\tCodigoPublicado,",
+				"\t\tNombreParada,",
+				"\t\tZona,",
+				"\t\tLatitud,",
+				"\t\tLongitud,",
+				"\t\tVigenciaDesde,",
+				"\t\tVigenciaHasta,",
+				"\t\tEstado",
+				"\t)) ~> sinkSilver",
+				"clasificar@observados, motivoDuplicado union(byName: true)~> unirObservados",
+				"unirObservados derive(Entidad = 'Paradas') ~> datosCuarentena",
+				"datosCuarentena sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tEntidad as string,",
+				"\t\tRegistroId as string,",
+				"\t\tFuente as string,",
+				"\t\tMotivo as string,",
+				"\t\tDatosOrigen as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tEntidad,",
+				"\t\tRegistroId,",
+				"\t\tFuente,",
+				"\t\tMotivo,",
+				"\t\tDatosOrigen",
+				"\t)) ~> sinkCuarentena"
+			]
+		}
+	}
+}

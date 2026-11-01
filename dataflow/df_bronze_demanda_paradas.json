@@ -1,0 +1,205 @@
+{
+	"name": "df_bronze_demanda_paradas",
+	"properties": {
+		"description": "Capa bronze: une DemandaParadas de CSV (2020-2021), Excel 2022, Excel 2023 y Azure SQL (2024-2025) sin limpiar. AnioFuente identifica el origen de cada fila.",
+		"folder": {
+			"name": "Bronze"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "bronze_demanda_paradas_csv",
+						"type": "DatasetReference"
+					},
+					"name": "csv"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_demanda_paradas_2022_xls",
+						"type": "DatasetReference"
+					},
+					"name": "xls2022"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_demanda_paradas_2023_xls",
+						"type": "DatasetReference"
+					},
+					"name": "xls2023"
+				},
+				{
+					"dataset": {
+						"referenceName": "bronze_demanda_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sql"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_demanda_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkBronze"
+				}
+			],
+			"transformations": [
+				{
+					"name": "renombrarCsv"
+				},
+				{
+					"name": "renombrarXls2022"
+				},
+				{
+					"name": "renombrarXls2023"
+				},
+				{
+					"name": "origenCsv"
+				},
+				{
+					"name": "origenXls2022"
+				},
+				{
+					"name": "origenXls2023"
+				},
+				{
+					"name": "unirFuentes"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tfec_servicio as string,",
+				"\t\tcod_ruta as string,",
+				"\t\tnro_parada as string,",
+				"\t\tfranja as string,",
+				"\t\tabordajes_manuales as string,",
+				"\t\tdescensos_manuales as string,",
+				"\t\tdemanda_no_atendida as string,",
+				"\t\tmedicion as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> csv",
+				"source(output(",
+				"\t\tfecha_servicio as string,",
+				"\t\tcod_ruta as string,",
+				"\t\tnro_parada as string,",
+				"\t\tfranja as string,",
+				"\t\testimacion_abordajes as string,",
+				"\t\testimacion_descensos as string,",
+				"\t\tdemanda_no_atendida as string,",
+				"\t\tmetodo as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> xls2022",
+				"source(output(",
+				"\t\tfecha_servicio as string,",
+				"\t\tcod_ruta as string,",
+				"\t\tnro_parada as string,",
+				"\t\tfranja as string,",
+				"\t\testimacion_abordajes as string,",
+				"\t\testimacion_descensos as string,",
+				"\t\tdemanda_no_atendida as string,",
+				"\t\tmetodo as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tignoreNoFilesFound: false) ~> xls2023",
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tDemandaId as string,",
+				"\t\tFechaServicio as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tParadaHistoricaId as string,",
+				"\t\tFranja as string,",
+				"\t\tValidacionesTarjeta as string,",
+				"\t\tDescensos as string,",
+				"\t\tDemandaNoAtendida as string,",
+				"\t\tMetodo as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> sql",
+				"csv select(mapColumn(",
+				"\t\tFechaServicio = fec_servicio,",
+				"\t\tRutaHistoricaId = cod_ruta,",
+				"\t\tParadaHistoricaId = nro_parada,",
+				"\t\tFranja = franja,",
+				"\t\tValidacionesTarjeta = abordajes_manuales,",
+				"\t\tDescensos = descensos_manuales,",
+				"\t\tDemandaNoAtendida = demanda_no_atendida,",
+				"\t\tMetodo = medicion",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarCsv",
+				"xls2022 select(mapColumn(",
+				"\t\tFechaServicio = fecha_servicio,",
+				"\t\tRutaHistoricaId = cod_ruta,",
+				"\t\tParadaHistoricaId = nro_parada,",
+				"\t\tFranja = franja,",
+				"\t\tValidacionesTarjeta = estimacion_abordajes,",
+				"\t\tDescensos = estimacion_descensos,",
+				"\t\tDemandaNoAtendida = demanda_no_atendida,",
+				"\t\tMetodo = metodo",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarXls2022",
+				"xls2023 select(mapColumn(",
+				"\t\tFechaServicio = fecha_servicio,",
+				"\t\tRutaHistoricaId = cod_ruta,",
+				"\t\tParadaHistoricaId = nro_parada,",
+				"\t\tFranja = franja,",
+				"\t\tValidacionesTarjeta = estimacion_abordajes,",
+				"\t\tDescensos = estimacion_descensos,",
+				"\t\tDemandaNoAtendida = demanda_no_atendida,",
+				"\t\tMetodo = metodo",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> renombrarXls2023",
+				"renombrarCsv derive(AnioFuente = '2020-2021') ~> origenCsv",
+				"renombrarXls2022 derive(AnioFuente = '2022') ~> origenXls2022",
+				"renombrarXls2023 derive(AnioFuente = '2023') ~> origenXls2023",
+				"origenCsv, origenXls2022, origenXls2023, sql union(byName: true)~> unirFuentes",
+				"unirFuentes sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tAnioFuente as string,",
+				"\t\tDemandaId as string,",
+				"\t\tFechaServicio as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tParadaHistoricaId as string,",
+				"\t\tFranja as string,",
+				"\t\tValidacionesTarjeta as string,",
+				"\t\tDescensos as string,",
+				"\t\tDemandaNoAtendida as string,",
+				"\t\tMetodo as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tAnioFuente,",
+				"\t\tDemandaId,",
+				"\t\tFechaServicio,",
+				"\t\tRutaHistoricaId,",
+				"\t\tParadaHistoricaId,",
+				"\t\tFranja,",
+				"\t\tValidacionesTarjeta,",
+				"\t\tDescensos,",
+				"\t\tDemandaNoAtendida,",
+				"\t\tMetodo",
+				"\t)) ~> sinkBronze"
+			]
+		}
+	}
+}

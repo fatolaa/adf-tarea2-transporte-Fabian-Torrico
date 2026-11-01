@@ -1,0 +1,290 @@
+{
+	"name": "pl_silver",
+	"properties": {
+		"description": "Limpia, tipa, aplica equivalencias y valida los datos de bronze hacia silver.",
+		"activities": [
+			{
+				"name": "Limpiar silver",
+				"description": "Vacia silver respetando las llaves foraneas (primero hijos, luego padres).",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "sql_dw_transporte",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": "DELETE FROM silver.IncidenteRuta;\nDELETE FROM silver.Incidentes;\nDELETE FROM silver.DemandaParadas;\nDELETE FROM silver.Viajes;\nDELETE FROM silver.Vehiculos;\nDELETE FROM silver.Paradas;\nDELETE FROM silver.Rutas;\nDELETE FROM silver.Cuarentena;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "df_silver_rutas",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Limpiar silver",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_silver_rutas",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "df_silver_paradas",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "df_silver_rutas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_silver_paradas",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "df_silver_vehiculos",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "df_silver_paradas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_silver_vehiculos",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "df_silver_viajes",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "df_silver_vehiculos",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_silver_viajes",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "df_silver_demanda_paradas",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "df_silver_viajes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_silver_demanda_paradas",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "df_silver_incidentes",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "df_silver_demanda_paradas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_silver_incidentes",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "df_silver_incidente_ruta",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "df_silver_incidentes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_silver_incidente_ruta",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "Registrar auditoria",
+				"description": "Guarda el conteo bronze / silver / cuarentena de esta ejecucion.",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "df_silver_incidente_ruta",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "sql_dw_transporte",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": "INSERT INTO silver.AuditoriaCarga (Entidad, FilasBronze, FilasSilver, FilasCuarentena)\nSELECT 'Rutas', (SELECT COUNT(*) FROM bronze.Rutas), (SELECT COUNT(*) FROM silver.Rutas), (SELECT COUNT(*) FROM silver.Cuarentena WHERE Entidad = 'Rutas')\nUNION ALL\nSELECT 'Paradas', (SELECT COUNT(*) FROM bronze.Paradas), (SELECT COUNT(*) FROM silver.Paradas), (SELECT COUNT(*) FROM silver.Cuarentena WHERE Entidad = 'Paradas')\nUNION ALL\nSELECT 'Vehiculos', (SELECT COUNT(*) FROM bronze.Vehiculos), (SELECT COUNT(*) FROM silver.Vehiculos), (SELECT COUNT(*) FROM silver.Cuarentena WHERE Entidad = 'Vehiculos')\nUNION ALL\nSELECT 'Viajes', (SELECT COUNT(*) FROM bronze.Viajes), (SELECT COUNT(*) FROM silver.Viajes), (SELECT COUNT(*) FROM silver.Cuarentena WHERE Entidad = 'Viajes')\nUNION ALL\nSELECT 'DemandaParadas', (SELECT COUNT(*) FROM bronze.DemandaParadas), (SELECT COUNT(*) FROM silver.DemandaParadas), (SELECT COUNT(*) FROM silver.Cuarentena WHERE Entidad = 'DemandaParadas')\nUNION ALL\nSELECT 'Incidentes', (SELECT COUNT(*) FROM bronze.Incidentes), (SELECT COUNT(*) FROM silver.Incidentes), (SELECT COUNT(*) FROM silver.Cuarentena WHERE Entidad = 'Incidentes')\nUNION ALL\nSELECT 'IncidenteRuta', (SELECT COUNT(*) FROM bronze.IncidenteRuta), (SELECT COUNT(*) FROM silver.IncidenteRuta), (SELECT COUNT(*) FROM silver.Cuarentena WHERE Entidad = 'IncidenteRuta');"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"folder": {
+			"name": "Medallon"
+		},
+		"annotations": []
+	}
+}

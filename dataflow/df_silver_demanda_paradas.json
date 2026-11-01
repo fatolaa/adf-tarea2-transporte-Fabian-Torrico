@@ -1,0 +1,247 @@
+{
+	"name": "df_silver_demanda_paradas",
+	"properties": {
+		"description": "Silver demanda: CSV y Excel no traen id; se genera DM-anio-correlativo. NO_MEDIDO se conserva como metodo para la cobertura de medicion.",
+		"folder": {
+			"name": "Silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_demanda_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "bronze"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "rutasSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "paradasSilver"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_silver_demanda_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_cuarentena_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkCuarentena"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "tipar"
+				},
+				{
+					"name": "equivalencias"
+				},
+				{
+					"name": "numerarFilas"
+				},
+				{
+					"name": "generarId"
+				},
+				{
+					"name": "rutasSilverClave"
+				},
+				{
+					"name": "buscarRutasSilver"
+				},
+				{
+					"name": "paradasSilverClave"
+				},
+				{
+					"name": "buscarParadasSilver"
+				},
+				{
+					"name": "validar"
+				},
+				{
+					"name": "clasificar"
+				},
+				{
+					"name": "ordenarVersiones"
+				},
+				{
+					"name": "quitarDuplicados"
+				},
+				{
+					"name": "motivoDuplicado"
+				},
+				{
+					"name": "unirObservados"
+				},
+				{
+					"name": "datosCuarentena"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tDemandaId as string,",
+				"\t\tFechaServicio as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tParadaHistoricaId as string,",
+				"\t\tFranja as string,",
+				"\t\tValidacionesTarjeta as string,",
+				"\t\tDescensos as string,",
+				"\t\tDemandaNoAtendida as string,",
+				"\t\tMetodo as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> bronze",
+				"bronze derive(t_DemandaId = upper(coalesce(trim(DemandaId), '')),",
+				"\t\tt_FechaServicio = coalesce(trim(FechaServicio), ''),",
+				"\t\tt_RutaHistoricaId = upper(coalesce(trim(RutaHistoricaId), '')),",
+				"\t\tt_ParadaHistoricaId = upper(coalesce(trim(ParadaHistoricaId), '')),",
+				"\t\tt_Franja = coalesce(trim(Franja), ''),",
+				"\t\tt_ValidacionesTarjeta = coalesce(trim(ValidacionesTarjeta), ''),",
+				"\t\tt_Descensos = coalesce(trim(Descensos), ''),",
+				"\t\tt_DemandaNoAtendida = coalesce(trim(DemandaNoAtendida), ''),",
+				"\t\tt_Metodo = upper(coalesce(trim(Metodo), '')),",
+				"\t\tFuente = coalesce(trim(AnioFuente), 'SIN_ORIGEN'),",
+				"\t\tPrioridad = coalesce(toInteger(left(trim(AnioFuente), 4)), 0),",
+				"\t\tDatosOrigen = left(concatWS('|', coalesce(DemandaId, ''), coalesce(FechaServicio, ''), coalesce(RutaHistoricaId, ''), coalesce(ParadaHistoricaId, ''), coalesce(Franja, ''), coalesce(ValidacionesTarjeta, ''), coalesce(Descensos, ''), coalesce(DemandaNoAtendida, ''), coalesce(Metodo, '')), 1000)) ~> normalizar",
+				"normalizar derive(FechaServicio = case(t_FechaServicio == '', toDate(null()), regexMatch(t_FechaServicio, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'), toDate(t_FechaServicio, 'dd/MM/yyyy'), regexMatch(t_FechaServicio, '^[0-9]{4}-[0-9]{2}-[0-9]{2}.*$'), toDate(left(t_FechaServicio, 10), 'yyyy-MM-dd'), regexMatch(t_FechaServicio, '^[0-9]{5}([.]0+)?$'), addDays(toDate('1899-12-30', 'yyyy-MM-dd'), toInteger(toDouble(t_FechaServicio))), regexMatch(t_FechaServicio, '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}.*$'), toDate(regexExtract(t_FechaServicio, '^([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})', 1), 'M/d/yyyy'), toDate(null())),",
+				"\t\tFranja = replace(t_Franja, ' ', ''),",
+				"\t\tValidacionesTarjeta = toInteger(round(toDouble(replace(t_ValidacionesTarjeta, ',', '.')))),",
+				"\t\tDescensos = toInteger(round(toDouble(replace(t_Descensos, ',', '.')))),",
+				"\t\tDemandaNoAtendida = toInteger(round(toDouble(replace(t_DemandaNoAtendida, ',', '.')))),",
+				"\t\tMetodo = t_Metodo,",
+				"\t\tAnioServicio = year(FechaServicio)) ~> tipar",
+				"tipar derive(RutaHistoricaId = case(t_RutaHistoricaId == '', '', left(t_RutaHistoricaId, 3) == 'RH-', t_RutaHistoricaId, !regexMatch(t_RutaHistoricaId, '^.*[0-9].*$'), t_RutaHistoricaId, regexMatch(t_RutaHistoricaId, '^.*-[NS]$'), concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'), '-', right(t_RutaHistoricaId, 1)), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '07', iif(!isNull(FechaServicio) && FechaServicio >= toDate('2024-01-01', 'yyyy-MM-dd'), 'RH-07-NEW', 'RH-07-OLD'), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '12', 'RH-12-OLD', concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'))),",
+				"\t\tParadaHistoricaId = case(t_ParadaHistoricaId == 'MC-01', iif(!isNull(FechaServicio) && FechaServicio >= toDate('2023-07-01', 'yyyy-MM-dd'), 'P220-MC-NEW', 'P219-MC-OLD'), t_ParadaHistoricaId)) ~> equivalencias",
+				"equivalencias window(over(AnioServicio),",
+				"\tasc(FechaServicio, true),",
+				"\tasc(RutaHistoricaId, true),",
+				"\tasc(ParadaHistoricaId, true),",
+				"\tasc(Franja, true),",
+				"\tnumeroFila = rowNumber()) ~> numerarFilas",
+				"numerarFilas derive(DemandaId = iif(t_DemandaId != '', t_DemandaId, iif(isNull(AnioServicio), '', concat('DM-', toString(AnioServicio), '-', lpad(toString(numeroFila), 5, '0'))))) ~> generarId",
+				"source(output(",
+				"\t\tRutaHistoricaId as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> rutasSilver",
+				"rutasSilver select(mapColumn(",
+				"\t\trefRutaId = RutaHistoricaId",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> rutasSilverClave",
+				"generarId, rutasSilverClave lookup(RutaHistoricaId == refRutaId,",
+				"\tmultiple: false,",
+				"\tpickup: 'any',",
+				"\tbroadcast: 'auto')~> buscarRutasSilver",
+				"source(output(",
+				"\t\tParadaHistoricaId as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> paradasSilver",
+				"paradasSilver select(mapColumn(",
+				"\t\trefParadaId = ParadaHistoricaId",
+				"\t),",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true) ~> paradasSilverClave",
+				"buscarRutasSilver, paradasSilverClave lookup(ParadaHistoricaId == refParadaId,",
+				"\tmultiple: false,",
+				"\tpickup: 'any',",
+				"\tbroadcast: 'auto')~> buscarParadasSilver",
+				"buscarParadasSilver derive(Motivo = case(isNull(FechaServicio), 'FECHA DE SERVICIO INVALIDA', !regexMatch(Franja, '^[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]$'), 'FRANJA HORARIA INVALIDA', isNull(ValidacionesTarjeta) || isNull(Descensos) || isNull(DemandaNoAtendida), 'VALOR NUMERICO INVALIDO', ValidacionesTarjeta < 0 || Descensos < 0 || DemandaNoAtendida < 0, 'VALOR NUMERICO NEGATIVO', Metodo == '', 'METODO DE MEDICION VACIO', isNull(refRutaId), 'RUTA NO EXISTE EN SILVER', isNull(refParadaId), 'PARADA NO EXISTE EN SILVER', ''),",
+				"\t\tRegistroId = iif(DemandaId != '', DemandaId, concat(t_RutaHistoricaId, '/', t_ParadaHistoricaId, '/', t_FechaServicio))) ~> validar",
+				"validar split(Motivo == '',",
+				"\tdisjoint: false) ~> clasificar@(validos, observados)",
+				"clasificar@validos window(over(DemandaId),",
+				"\tdesc(Prioridad, true),",
+				"\tversion = rowNumber()) ~> ordenarVersiones",
+				"ordenarVersiones split(version == 1,",
+				"\tdisjoint: false) ~> quitarDuplicados@(unicos, duplicados)",
+				"quitarDuplicados@duplicados derive(Motivo = 'DUPLICADO: se conserva la version de la fuente mas reciente') ~> motivoDuplicado",
+				"quitarDuplicados@unicos sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tDemandaId as string,",
+				"\t\tFechaServicio as date,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tParadaHistoricaId as string,",
+				"\t\tFranja as string,",
+				"\t\tValidacionesTarjeta as integer,",
+				"\t\tDescensos as integer,",
+				"\t\tDemandaNoAtendida as integer,",
+				"\t\tMetodo as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tDemandaId,",
+				"\t\tFechaServicio,",
+				"\t\tRutaHistoricaId,",
+				"\t\tParadaHistoricaId,",
+				"\t\tFranja,",
+				"\t\tValidacionesTarjeta,",
+				"\t\tDescensos,",
+				"\t\tDemandaNoAtendida,",
+				"\t\tMetodo",
+				"\t)) ~> sinkSilver",
+				"clasificar@observados, motivoDuplicado union(byName: true)~> unirObservados",
+				"unirObservados derive(Entidad = 'DemandaParadas') ~> datosCuarentena",
+				"datosCuarentena sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tEntidad as string,",
+				"\t\tRegistroId as string,",
+				"\t\tFuente as string,",
+				"\t\tMotivo as string,",
+				"\t\tDatosOrigen as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tEntidad,",
+				"\t\tRegistroId,",
+				"\t\tFuente,",
+				"\t\tMotivo,",
+				"\t\tDatosOrigen",
+				"\t)) ~> sinkCuarentena"
+			]
+		}
+	}
+}
