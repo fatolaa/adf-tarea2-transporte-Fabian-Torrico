@@ -1,0 +1,48 @@
+{
+	"name": "sw_silver_vehiculos_sql",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "sql_dw_transporte",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "silver/sql"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "VehiculoId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Placa",
+				"type": "nvarchar"
+			},
+			{
+				"name": "TipoVehiculo",
+				"type": "nvarchar"
+			},
+			{
+				"name": "CapacidadEfectiva",
+				"type": "int"
+			},
+			{
+				"name": "VigenciaDesde",
+				"type": "date"
+			},
+			{
+				"name": "VigenciaHasta",
+				"type": "date"
+			},
+			{
+				"name": "Estado",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "silver",
+			"table": "Vehiculos"
+		}
+	}
+}

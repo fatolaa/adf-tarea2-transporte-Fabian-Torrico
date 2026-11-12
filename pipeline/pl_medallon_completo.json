@@ -1,0 +1,45 @@
+{
+	"name": "pl_medallon_completo",
+	"properties": {
+		"description": "Ejecuta bronze y luego silver.",
+		"activities": [
+			{
+				"name": "Ejecutar bronze",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_bronze",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Ejecutar silver",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Ejecutar bronze",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_silver",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "Medallon"
+		},
+		"annotations": []
+	}
+}

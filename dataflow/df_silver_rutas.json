@@ -1,0 +1,171 @@
+{
+	"name": "df_silver_rutas",
+	"properties": {
+		"description": "Silver rutas: tipa fechas, normaliza codigos (05, R-05, Ruta 5 -> RH-05) y aplica equivalencias historicas (RH-07-OLD/NEW, RH-12-OLD, RH-12-N/S).",
+		"folder": {
+			"name": "Silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "sw_bronze_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "bronze"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "sw_silver_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkSilver"
+				},
+				{
+					"dataset": {
+						"referenceName": "sw_silver_cuarentena_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sinkCuarentena"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "tipar"
+				},
+				{
+					"name": "equivalencias"
+				},
+				{
+					"name": "validar"
+				},
+				{
+					"name": "clasificar"
+				},
+				{
+					"name": "ordenarVersiones"
+				},
+				{
+					"name": "quitarDuplicados"
+				},
+				{
+					"name": "motivoDuplicado"
+				},
+				{
+					"name": "unirObservados"
+				},
+				{
+					"name": "datosCuarentena"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"\t\tAnioFuente as string,",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tCodigoRuta as string,",
+				"\t\tNombreRuta as string,",
+				"\t\tOrigen as string,",
+				"\t\tDestino as string,",
+				"\t\tVigenciaDesde as string,",
+				"\t\tVigenciaHasta as string,",
+				"\t\tEstado as string",
+				"\t),",
+				"\tallowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tisolationLevel: 'READ_UNCOMMITTED',",
+				"\tformat: 'table') ~> bronze",
+				"bronze derive(t_RutaHistoricaId = upper(coalesce(trim(RutaHistoricaId), '')),",
+				"\t\tt_CodigoRuta = upper(coalesce(trim(CodigoRuta), '')),",
+				"\t\tt_NombreRuta = coalesce(trim(NombreRuta), ''),",
+				"\t\tt_Origen = coalesce(trim(Origen), ''),",
+				"\t\tt_Destino = coalesce(trim(Destino), ''),",
+				"\t\tt_VigenciaDesde = coalesce(trim(VigenciaDesde), ''),",
+				"\t\tt_VigenciaHasta = coalesce(trim(VigenciaHasta), ''),",
+				"\t\tt_Estado = upper(coalesce(trim(Estado), '')),",
+				"\t\tFuente = coalesce(trim(AnioFuente), 'SIN_ORIGEN'),",
+				"\t\tPrioridad = coalesce(toInteger(left(trim(AnioFuente), 4)), 0),",
+				"\t\tDatosOrigen = left(concatWS('|', coalesce(RutaHistoricaId, ''), coalesce(CodigoRuta, ''), coalesce(NombreRuta, ''), coalesce(Origen, ''), coalesce(Destino, ''), coalesce(VigenciaDesde, ''), coalesce(VigenciaHasta, ''), coalesce(Estado, '')), 1000)) ~> normalizar",
+				"normalizar derive(VigenciaDesde = case(t_VigenciaDesde == '', toDate(null()), regexMatch(t_VigenciaDesde, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'), toDate(t_VigenciaDesde, 'dd/MM/yyyy'), regexMatch(t_VigenciaDesde, '^[0-9]{4}-[0-9]{2}-[0-9]{2}.*$'), toDate(left(t_VigenciaDesde, 10), 'yyyy-MM-dd'), regexMatch(t_VigenciaDesde, '^[0-9]{5}([.]0+)?$'), addDays(toDate('1899-12-30', 'yyyy-MM-dd'), toInteger(toDouble(t_VigenciaDesde))), regexMatch(t_VigenciaDesde, '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}.*$'), toDate(regexExtract(t_VigenciaDesde, '^([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})', 1), 'M/d/yyyy'), toDate(null())),",
+				"\t\tVigenciaHasta = case(t_VigenciaHasta == '', toDate(null()), regexMatch(t_VigenciaHasta, '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'), toDate(t_VigenciaHasta, 'dd/MM/yyyy'), regexMatch(t_VigenciaHasta, '^[0-9]{4}-[0-9]{2}-[0-9]{2}.*$'), toDate(left(t_VigenciaHasta, 10), 'yyyy-MM-dd'), regexMatch(t_VigenciaHasta, '^[0-9]{5}([.]0+)?$'), addDays(toDate('1899-12-30', 'yyyy-MM-dd'), toInteger(toDouble(t_VigenciaHasta))), regexMatch(t_VigenciaHasta, '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}.*$'), toDate(regexExtract(t_VigenciaHasta, '^([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})', 1), 'M/d/yyyy'), toDate(null())),",
+				"\t\tNombreRuta = t_NombreRuta,",
+				"\t\tOrigen = t_Origen,",
+				"\t\tDestino = t_Destino,",
+				"\t\tEstado = t_Estado) ~> tipar",
+				"tipar derive(RutaHistoricaId = case(t_RutaHistoricaId == '', '', left(t_RutaHistoricaId, 3) == 'RH-', t_RutaHistoricaId, !regexMatch(t_RutaHistoricaId, '^.*[0-9].*$'), t_RutaHistoricaId, regexMatch(t_RutaHistoricaId, '^.*-[NS]$'), concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'), '-', right(t_RutaHistoricaId, 1)), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '07', iif(!isNull(VigenciaDesde) && VigenciaDesde >= toDate('2024-01-01', 'yyyy-MM-dd'), 'RH-07-NEW', 'RH-07-OLD'), lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0') == '12', 'RH-12-OLD', concat('RH-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'))),",
+				"\t\tCodigoRuta = case(t_CodigoRuta != '', t_CodigoRuta, !regexMatch(t_RutaHistoricaId, '^.*[0-9].*$'), '', regexMatch(t_RutaHistoricaId, '^.*-[NS]$'), concat('R', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0'), '-', right(t_RutaHistoricaId, 1)), concat('R-', lpad(regexExtract(t_RutaHistoricaId, '([0-9]+)', 1), 2, '0')))) ~> equivalencias",
+				"equivalencias derive(Motivo = case(RutaHistoricaId == '', 'RUTA SIN CODIGO', !regexMatch(RutaHistoricaId, '^RH-[0-9]{2}(-N|-S|-NEW|-OLD)?$'), 'CODIGO DE RUTA NO RECONOCIDO', NombreRuta == '', 'NOMBRE VACIO', Origen == '' || Destino == '', 'ORIGEN O DESTINO VACIO', isNull(VigenciaDesde) || isNull(VigenciaHasta), 'FECHA DE VIGENCIA INVALIDA', VigenciaHasta < VigenciaDesde, 'VIGENCIA HASTA ANTERIOR A VIGENCIA DESDE', Estado == '', 'ESTADO VACIO', ''),",
+				"\t\tRegistroId = iif(RutaHistoricaId != '', RutaHistoricaId, t_RutaHistoricaId)) ~> validar",
+				"validar split(Motivo == '',",
+				"\tdisjoint: false) ~> clasificar@(validos, observados)",
+				"clasificar@validos window(over(RutaHistoricaId),",
+				"\tdesc(Prioridad, true),",
+				"\tversion = rowNumber()) ~> ordenarVersiones",
+				"ordenarVersiones split(version == 1,",
+				"\tdisjoint: false) ~> quitarDuplicados@(unicos, duplicados)",
+				"quitarDuplicados@duplicados derive(Motivo = 'DUPLICADO: se conserva la version de la fuente mas reciente') ~> motivoDuplicado",
+				"quitarDuplicados@unicos sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tRutaHistoricaId as string,",
+				"\t\tCodigoRuta as string,",
+				"\t\tNombreRuta as string,",
+				"\t\tOrigen as string,",
+				"\t\tDestino as string,",
+				"\t\tVigenciaDesde as date,",
+				"\t\tVigenciaHasta as date,",
+				"\t\tEstado as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tRutaHistoricaId,",
+				"\t\tCodigoRuta,",
+				"\t\tNombreRuta,",
+				"\t\tOrigen,",
+				"\t\tDestino,",
+				"\t\tVigenciaDesde,",
+				"\t\tVigenciaHasta,",
+				"\t\tEstado",
+				"\t)) ~> sinkSilver",
+				"clasificar@observados, motivoDuplicado union(byName: true)~> unirObservados",
+				"unirObservados derive(Entidad = 'Rutas') ~> datosCuarentena",
+				"datosCuarentena sink(allowSchemaDrift: true,",
+				"\tvalidateSchema: false,",
+				"\tinput(",
+				"\t\tEntidad as string,",
+				"\t\tRegistroId as string,",
+				"\t\tFuente as string,",
+				"\t\tMotivo as string,",
+				"\t\tDatosOrigen as string",
+				"\t),",
+				"\tdeletable:false,",
+				"\tinsertable:true,",
+				"\tupdateable:false,",
+				"\tupsertable:false,",
+				"\tformat: 'table',",
+				"\tskipDuplicateMapInputs: true,",
+				"\tskipDuplicateMapOutputs: true,",
+				"\terrorHandlingOption: 'stopOnFirstError',",
+				"\tmapColumn(",
+				"\t\tEntidad,",
+				"\t\tRegistroId,",
+				"\t\tFuente,",
+				"\t\tMotivo,",
+				"\t\tDatosOrigen",
+				"\t)) ~> sinkCuarentena"
+			]
+		}
+	}
+}

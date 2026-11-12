@@ -1,0 +1,62 @@
+{
+	"name": "sw_silver_viajes_sql",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "sql_dw_transporte",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "silver/sql"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "ViajeId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "RutaHistoricaId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "VehiculoId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "FechaServicio",
+				"type": "date"
+			},
+			{
+				"name": "HoraProgramada",
+				"type": "time"
+			},
+			{
+				"name": "HoraSalida",
+				"type": "time"
+			},
+			{
+				"name": "HoraLlegada",
+				"type": "time"
+			},
+			{
+				"name": "ValidacionesTarjeta",
+				"type": "int"
+			},
+			{
+				"name": "KmRecorridos",
+				"type": "decimal",
+				"precision": 8,
+				"scale": 1
+			},
+			{
+				"name": "EstadoViaje",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "silver",
+			"table": "Viajes"
+		}
+	}
+}
